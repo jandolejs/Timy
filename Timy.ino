@@ -2,7 +2,7 @@
 #include <avr/power.h>
 #include <EEPROM.h>
 
-#define goto_menu Page_show = Page_menu; Timer_active = false; Alert_active = false; AP_running = false; mel_play(mel_done); now_active; checkWarning;
+#define goto_menu Page_show = Page_menu; Timer_active = false; Alert_active = false; AP_running = false; melody.done(); now_active; checkWarning;
 #define checkWarning if(Batt_warning){Battery_warning_show = 5;}
 #define casovac_ap ((Timer_auto_default+1)-(((millis()-AP_start)/1000)+1))
 #define now_active AO_lastActivity = millis(); Serial.print(".")
@@ -34,7 +34,10 @@ U8GLIB_SSD1306_128X64 display(U8G_I2C_OPT_DEV_0|U8G_I2C_OPT_FAST);
 #define at_sett Page_show == Page_sett
 
 #define pin_led_powr 7 // LED -power
+
+#include "Universal.h"
 #define pin_piezo    6 // Piezo
+Melody melody(pin_piezo);
 
 #define bA_pin 4 // Button A pin
 #define bB_pin 3 // Button B pin
@@ -56,14 +59,6 @@ U8GLIB_SSD1306_128X64 display(U8G_I2C_OPT_DEV_0|U8G_I2C_OPT_FAST);
 
 #define Prom_aotimeout 50
 #define Prom_battlow   51
-
-#define mel_welc 1
-#define mel_hihi 2
-#define mel_nope 3
-#define mel_done 4
-#define mel_byby 5
-#define mel_auto 6
-
 
 bool
     AP_running, Batt_warning, LED_enable,
@@ -173,7 +168,7 @@ void apHandler() {
     if (at_auto) {
 
         if (AP_running and AP_step == 0 and millis()/1000 - AP_start/1000 > (Timer_auto_default)) {
-            AP_running = false; AP_step = 1; mel_play(mel_auto); now_active;
+            AP_running = false; AP_step = 1; melody.atop(); now_active;
         }
         if (AP_step > 1) { byte _secs = Auto_timer_steps;
 
@@ -240,9 +235,9 @@ void buttonWatch() {
 
     if (!flag and bA_now and !bX_now and !bB_now) { flag = true;
 
-        if      (at_menu) {start_timer(Timer_val_default); mel_play(mel_done); now_active; checkWarning; }
+        if      (at_menu) {start_timer(Timer_val_default); melody.done(); now_active; checkWarning; }
         else if (at_alrt) {goto_menu; }
-        else if (at_auto and AP_step == 1) {AP_step = 2; AP_start = millis(); mel_play(mel_done); now_active; return; }
+        else if (at_auto and AP_step == 1) {AP_step = 2; AP_start = millis(); melody.done(); now_active; return; }
         else if (at_sett) {
             switch (Sett_page_now) {
                 case Sett_page_ao:
@@ -270,7 +265,7 @@ void buttonWatch() {
                 break;
             }
         }
-        else    {mel_play(mel_nope); now_active; }
+        else    {melody.nope(); now_active; }
     }
     if (bA_now and at_sett and Sett_page_now == Sett_page_mn) {
         LED_enable = true;
@@ -293,7 +288,7 @@ void buttonWatch() {
 
     if (!flag and !bA_now and !bX_now and bB_now) { flag = true;
 
-        if      (at_menu)                  {start_ap(); mel_play(mel_done); now_active; checkWarning; }
+        if      (at_menu)                  {start_ap(); melody.done(); now_active; checkWarning; }
         else if (at_auto and AP_step == 1) {AP_step = 2; AP_start = millis(); return; }
         else if (at_alrt)                  {goto_menu; }
         else if (at_sett) {
@@ -303,43 +298,10 @@ void buttonWatch() {
             }
             else Sett_page_now = 0;
         }
-        else {mel_play(mel_nope); now_active; }
+        else {melody.nope(); now_active; }
     }
 
     if(!bA_now and !bX_now and !bB_now){flag = false; }
-}
-
-void mel_play(byte _type) {
-    byte _pin = pin_piezo;
-    pinMode(_pin, OUTPUT);
-    switch (_type) {
-        case mel_welc:
-            tone(_pin, 4000, 100); delay(110);
-            tone(_pin, 5000, 100); delay(110);
-            tone(_pin, 6000, 100); delay(110);
-        break;
-        case mel_hihi:
-            tone(_pin, 4000, 100); delay(110);
-            tone(_pin, 6000, 100); delay(110);
-        break;
-        case mel_done:
-            tone(_pin, 5000,  20); delay( 20);
-        break;
-        case mel_nope:
-            tone(_pin, 700,   20); delay( 90);
-            tone(_pin, 800,   20); delay( 90);
-            tone(_pin, 600,   20); delay( 90);
-        break;
-        case mel_byby:
-            tone(_pin, 6000, 100); delay(110);
-            //tone(_pin, 5000, 100); delay(110);
-            tone(_pin, 4000, 100); delay(110);
-        break;
-        case mel_auto:
-            tone(_pin, 7000, 500); delay(500);
-        break;
-    }
-    pinMode(_pin, INPUT);
 }
 
 
@@ -410,8 +372,8 @@ void exitHandler() {
     if (at_exit) {
         
         long _exitingStarted = millis();
-        if (millis() < 1000) {mel_play(mel_welc); now_active; }
-        else {mel_play(mel_byby); now_active; }
+        if (millis() < 1000) {melody.welc(); now_active; }
+        else {melody.byby(); now_active; }
         display.firstPage(); do {draw(); } while(display.nextPage());
         while (LED_intensity) {
             LED_intensity--; delay(map(LED_intensity, 0, 255, 10, 0));
@@ -435,7 +397,7 @@ void exitHandler() {
         // --------------------------------
 
         sleep_disable(); detachInterrupt(0); detachInterrupt(1);
-        ADCSRA = _oldAD; display.sleepOff(); mel_play(mel_hihi); now_active;
+        ADCSRA = _oldAD; display.sleepOff(); melody.hihi(); now_active;
         flag = true; delay(40);
         if(wakeupPin) {
             unsigned long b_button_pressed = millis();
