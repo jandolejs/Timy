@@ -1,18 +1,20 @@
 #include <avr/sleep.h>
 #include <avr/power.h>
-#include "U8glib.h"
 #include <EEPROM.h>
-#include <Adafruit_NeoPixel.h>
 
 #define goto_menu Page_show = Page_menu; Timer_active = false; Alert_active = false; AP_running = false; mel_play(mel_done); checkWarning;
 #define checkWarning if(Batt_warning){Battery_warning_show = 5;}
 #define casovac_ap ((Timer_auto_default+1)-(((millis()-AP_start)/1000)+1))
 #define now_active AO_lastActivity = millis(); Serial.print(".")
 
-Adafruit_NeoPixel strip(2, 8, NEO_GRB + NEO_KHZ800);
+#include <Adafruit_NeoPixel.h>
+#define pin_led_data  8 // LED -data
+Adafruit_NeoPixel strip(2, pin_led_data, NEO_GRB + NEO_KHZ800);
+
+#include "U8glib.h"
+U8GLIB_SSD1306_128X64 display(U8G_I2C_OPT_DEV_0|U8G_I2C_OPT_FAST);
 #define sfa display.setFont(u8g_font_unifontr); display.drawStr
 #define sfb display.setFont(u8g_font_ncenB24r); display.drawStr
-U8GLIB_SSD1306_128X64 display(U8G_I2C_OPT_DEV_0|U8G_I2C_OPT_FAST);
 //U8GLIB_SSD1306_128X64 display(U8G_I2C_OPT_NONE|U8G_I2C_OPT_DEV_0);  // I2C / TWI
 //U8GLIB_SSD1306_128X64 display(U8G_I2C_OPT_DEV_0|U8G_I2C_OPT_NO_ACK|U8G_I2C_OPT_FAST); // Fast I2C / TWI
 //U8GLIB_SSD1306_128X64 display(U8G_I2C_OPT_NONE|U8G_I2C_OPT_DEV_0);  // I2C / TWI
@@ -31,10 +33,12 @@ U8GLIB_SSD1306_128X64 display(U8G_I2C_OPT_DEV_0|U8G_I2C_OPT_FAST);
 #define at_welc Page_show == Page_welc
 #define at_sett Page_show == Page_sett
 
-#define pin_lcd_powr  8 // LCD -power
-#define pin_led_data  7 // LED -data
-#define pin_led_powr  9 // LED -power
-#define pin_piezo     6 // Piezo
+#define pin_led_powr 7 // LED -power
+#define pin_piezo    6 // Piezo
+
+#define bA_pin 4 // Button A pin
+#define bB_pin 3 // Button B pin
+#define bX_pin 2 // Button Back pin
 
 #define Page_welc 1
 #define Page_timr 2
@@ -223,9 +227,9 @@ void alertHandling() {
 bool flag;
 bool ledSpeed;
 
-#define bA_now !digitalRead(4)
-#define bX_now !digitalRead(2)
-#define bB_now !digitalRead(3)
+#define bA_now (!digitalRead(bA_pin))
+#define bX_now (!digitalRead(bX_pin))
+#define bB_now (!digitalRead(bB_pin))
 
 void buttonWatch() {
 
@@ -302,7 +306,7 @@ void buttonWatch() {
         else {mel_play(mel_nope); }
     }
 
-    if(digitalRead(2) and digitalRead(3) and digitalRead(4)){flag = false; }
+    if(!bA_now and !bX_now and !bB_now){flag = false; }
 }
 
 void mel_play(byte _type) {
@@ -344,7 +348,7 @@ void setup() {
     pinMode(2, INPUT_PULLUP);
     pinMode(3, INPUT_PULLUP);
     pinMode(4, INPUT_PULLUP);
-    pinMode(pin_lcd_powr, OUTPUT); digitalWrite(pin_lcd_powr, HIGH);
+
     pinMode(pin_led_powr, OUTPUT); digitalWrite(pin_led_powr, HIGH);
 
     Serial.begin(250000); Serial.print("start");
@@ -387,7 +391,7 @@ void rutine() {
 }
 void ledHandler() {
     if(LED_enable) {
-        pinMode(7, OUTPUT); digitalWrite(7, HIGH);
+        pinMode(pin_led_powr, OUTPUT); digitalWrite(pin_led_powr, HIGH);
         if (LED_intensity < 255) {LED_intensity++; delay(map(LED_intensity, 0, 255, 25, 0)); }
         uint32_t rgbcolor = strip.ColorHSV(LED_hue, LED_saturation, LED_intensity);
         strip.fill(rgbcolor); strip.show();
@@ -397,7 +401,7 @@ void ledHandler() {
             uint32_t rgbcolor = strip.ColorHSV(LED_hue, LED_saturation, LED_intensity);
             strip.fill(rgbcolor); strip.show();
     }
-        else {pinMode(7,  INPUT); digitalWrite(7,  LOW); LED_intensity = 0; }
+        else {pinMode(7,  INPUT); digitalWrite(pin_led_powr,  LOW); LED_intensity = 0; }
     }
 }
 bool wakeupPin;
@@ -415,7 +419,7 @@ void exitHandler() {
             strip.fill(rgbcolor); strip.show();
         }
         while(millis() - _exitingStarted < 300);
-        pinMode(7,  INPUT); digitalWrite(7,  LOW); LED_intensity = 0;
+        pinMode(7,  INPUT); digitalWrite(pin_led_powr,  LOW); LED_intensity = 0;
         delay(100); Page_show = Page_blnk; display.firstPage(); do {draw(); } while(display.nextPage());
 
         display.sleepOn(); sleep_enable(); // wait, sleep display
