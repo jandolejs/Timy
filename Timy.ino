@@ -1,11 +1,7 @@
+#include "Universal.h"
 #include <avr/sleep.h>
 #include <avr/power.h>
 #include <EEPROM.h>
-
-#define goto_menu Page_show = Page_menu; Timer_active = false; Alert_active = false; AP_running = false; melody.done(); now_active; checkWarning;
-#define checkWarning if(Batt_warning){Battery_warning_show = 5;}
-#define casovac_ap ((Timer_auto_default+1)-(((millis()-AP_start)/1000)+1))
-#define now_active AO_lastActivity = millis(); Serial.print(".")
 
 #include <Adafruit_NeoPixel.h>
 #define pin_led_data  8 // LED -data
@@ -15,10 +11,11 @@ Adafruit_NeoPixel strip(2, pin_led_data, NEO_GRB + NEO_KHZ800);
 U8GLIB_SSD1306_128X64 display(U8G_I2C_OPT_DEV_0|U8G_I2C_OPT_FAST);
 #define sfa display.setFont(u8g_font_unifontr); display.drawStr
 #define sfb display.setFont(u8g_font_ncenB24r); display.drawStr
-//U8GLIB_SSD1306_128X64 display(U8G_I2C_OPT_NONE|U8G_I2C_OPT_DEV_0);  // I2C / TWI
-//U8GLIB_SSD1306_128X64 display(U8G_I2C_OPT_DEV_0|U8G_I2C_OPT_NO_ACK|U8G_I2C_OPT_FAST); // Fast I2C / TWI
-//U8GLIB_SSD1306_128X64 display(U8G_I2C_OPT_NONE|U8G_I2C_OPT_DEV_0);  // I2C / TWI
-//U8GLIB_SSD1306_128X64 display(U8G_I2C_OPT_NO_ACK);  // Display which does not send AC
+
+#define goto_menu Page_show = Page_menu; Timer_active = false; Alert_active = false; AP_running = false; melody.done(); now_active; checkWarning;
+#define checkWarning if(Batt_warning){Battery_warning_show = 5;}
+#define casovac_ap ((Timer_auto_default+1)-(((millis()-AP_start)/1000)+1))
+#define now_active AO_lastActivity = millis(); Serial.print(".")
 
 #define Timer_val_default  180 // odpočet 3 minuty // value_default=180
 #define Timer_auto_default 120 // první dvě minuty // value_default=120
@@ -34,8 +31,6 @@ U8GLIB_SSD1306_128X64 display(U8G_I2C_OPT_DEV_0|U8G_I2C_OPT_FAST);
 #define at_sett Page_show == Page_sett
 
 #define pin_led_powr 7 // LED -power
-
-#include "Universal.h"
 #define pin_piezo    6 // Piezo
 Melody melody(pin_piezo);
 
@@ -135,11 +130,11 @@ void draw() {
                 else {sfb(24, 60, _low); }
             break;
             case Sett_page_bt:
-                
+
                 char _volts[4]; itoa(readVcc(), _volts, 10);
                 char _percent[4]; itoa(Batt_percent, _percent, 10);
 
-                sfa(02, 12, "Batt:"); sfa(50, 10, _volts); sfa(80, 10, "[mV]"); 
+                sfa(02, 12, "Batt:"); sfa(50, 10, _volts); sfa(80, 10, "[mV]");
                 sfb(24, 60, _percent); sfb(63, 60, "%");
             break;
             case 4: sfa(02, 12, "d"); break;
@@ -370,7 +365,7 @@ bool wakeupPin;
 void exitHandler() {
 
     if (at_exit) {
-        
+
         long _exitingStarted = millis();
         if (millis() < 1000) {melody.welc(); now_active; }
         else {melody.byby(); now_active; }
@@ -389,7 +384,7 @@ void exitHandler() {
         _oldAD = ADCSRA;
         ADCSRA = 0; // set sleep mode, disable ADC
         MCUCR = bit (BODS) | bit (BODSE); MCUCR = bit (BODS); // vypne brown-out detection
-        attachInterrupt(0, wakeUp, LOW); attachInterrupt(1, wakeUpPlay, LOW); 
+        attachInterrupt(0, wakeUp, LOW); attachInterrupt(1, wakeUpPlay, LOW);
         sleep_cpu(); // power_all_disable(); //!todo zkusit taky tohle
 
         // --------------------------------
@@ -407,7 +402,7 @@ void exitHandler() {
             }}
             goto_menu;
         } else {start_ap(); checkWarning; }
-        
+
     }
 }
 void wakeUp() {
@@ -417,7 +412,7 @@ void wakeUpPlay() {
     wakeupPin = false; sleep_disable();
 }
 void timeout() {
-    
+
     if (!AO_timeout) return;
     uint32_t _tout = AO_timeout * 1000;
 
@@ -453,13 +448,13 @@ long readVcc() {
         ADMUX = _BV(MUX3) | _BV(MUX2);
         #else
         ADMUX = _BV(REFS0) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1);
-        #endif  
+        #endif
 
         delay(5); // Wait for Vref to settle
         ADCSRA |= _BV(ADSC); // Start conversion
         while (bit_is_set(ADCSRA,ADSC)); // measuring
 
-        uint8_t low  = ADCL; // must read ADCL first - it then locks ADCH  
+        uint8_t low  = ADCL; // must read ADCL first - it then locks ADCH
         uint8_t high = ADCH; // unlocks both
 
         long result = (high<<8) | low;
@@ -477,12 +472,12 @@ void baterryWatch() {
     //  baterry || 3572 || 4000  |
     // charging || 4160 || 4600  |
     //----------------------------
-    
+
     if (millis() - Batt_last > 1000) {
         Batt_last = millis();
         Batt_mv = readVcc();
         Batt_v  = Batt_mv / 1000;
-        
+
         if(Batt_mv < 3572) {
             // baterry is discharged
             Batt_mv = 3572;
